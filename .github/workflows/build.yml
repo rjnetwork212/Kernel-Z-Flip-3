@@ -1,0 +1,39 @@
+name: Kernel Build (Z Flip 3 + KernelSU)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ARCH: arm64
+      SUBARCH: arm64
+      KERNELSU: true
+
+    steps:
+    - name: Checkout Kernel Source
+      uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - name: Setup Android Toolchain
+      run: |
+        mkdir -p ~/toolchains
+        curl -O https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r450784d.tar.gz
+        tar -C ~/toolchains -xzf clang-r450784d.tar.gz
+        echo "TOOLCHAIN=$(pwd)/toolchains/clang-r450784d" >> $GITHUB_ENV
+
+    - name: Build Kernel
+      run: |
+        export PATH=$TOOLCHAIN/bin:$PATH
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export CC=clang
+        make vendor/b2q_eur_openx_defconfig
+        make -j$(nproc)
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Image.gz
+        path: arch/arm64/boot/Image.gz
