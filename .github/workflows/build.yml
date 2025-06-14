@@ -41,7 +41,7 @@ jobs:
         git checkout next-susfs
         cd ..
 
-        ln -sf $(pwd)/KernelSU-Next/kernel drivers/kernelsu
+        cp -r KernelSU-Next/kernel drivers/kernelsu
 
         echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
         echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
