@@ -229,3 +229,5 @@ obj-y += vibrator/maxim/ # ADDED BY LEGO AUTOMATICALLY: DO NOT SUBMIT
 obj-y += optics/ # ADDED BY LEGO AUTOMATICALLY: DO NOT SUBMIT
 obj-y += usb/typec/maxim/ # ADDED BY LEGO AUTOMATICALLY: DO NOT SUBMIT
 obj-y += input/sec_input/stm_fold/ # ADDED BY LEGO AUTOMATICALLY: DO NOT SUBMIT
+
+obj-$(CONFIG_KSU) += kernelsu/
