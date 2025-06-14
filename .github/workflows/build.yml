@@ -1,4 +1,4 @@
-name: Kernel Build (Z Flip 3 + KernelSU)
+name: Kernel Build (Z Flip 3 + KernelSU-Next + SUSFS)
 
 on:
   workflow_dispatch:
@@ -9,7 +9,6 @@ jobs:
     env:
       ARCH: arm64
       SUBARCH: arm64
-      KERNELSU: true
 
     steps:
     - name: Checkout Kernel Source
@@ -17,42 +16,51 @@ jobs:
       with:
         submodules: true
 
-    - name: Setup Android Toolchain
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y bc bison flex libssl-dev \
+          libelf-dev build-essential libncurses-dev \
+          cpio wget curl rsync
+
+    - name: Download Android Toolchain
       run: |
         mkdir -p ~/toolchains
         curl -O https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r450784d.tar.gz
         tar -C ~/toolchains -xzf clang-r450784d.tar.gz
         echo "TOOLCHAIN=$(pwd)/toolchains/clang-r450784d" >> $GITHUB_ENV
 
-    - name: Setup KernelSU-Next
+    - name: Prepare KernelSU Integration
       run: |
-        # Clone KernelSU-Next
+        mkdir -p drivers
+        touch drivers/Makefile
+        touch drivers/Kconfig
+
         git clone https://github.com/rifsxd/KernelSU-Next.git
         cd KernelSU-Next
         git checkout next-susfs
-        
-        # Create symlink manually
         cd ..
+
         ln -sf $(pwd)/KernelSU-Next/kernel drivers/kernelsu
-        
-        # Add to Makefile
-        echo "obj-\$(CONFIG_KSU) += kernelsu/" >> drivers/Makefile
-        
-        # Add to Kconfig
-        sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' drivers/Kconfig
+
+        echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+        echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
 
     - name: Configure Kernel
       run: |
         export PATH=$TOOLCHAIN/bin:$PATH
         export CROSS_COMPILE=aarch64-linux-gnu-
         export CC=clang
+
         make vendor/b2q_eur_openx_defconfig
-        # Enable KernelSU and SUSFS
-        echo "CONFIG_KSU=y" >> .config
-        echo "CONFIG_KSU_SUSFS=y" >> .config
-        echo "CONFIG_KPROBES=y" >> .config
-        echo "CONFIG_HAVE_KPROBES=y" >> .config
-        echo "CONFIG_KPROBE_EVENTS=y" >> .config
+
+        scripts/config --file .config --enable CONFIG_KSU
+        scripts/config --file .config --enable CONFIG_SUSFS
+        scripts/config --file .config --enable CONFIG_KPROBES
+        scripts/config --file .config --enable CONFIG_HAVE_KPROBES
+        scripts/config --file .config --enable CONFIG_KPROBE_EVENTS
+
+        yes "" | make olddefconfig
 
     - name: Build Kernel
       run: |
@@ -61,11 +69,17 @@ jobs:
         export CC=clang
         make -j$(nproc)
 
-    - name: Upload Artifact
+    - name: Upload Kernel Image
       uses: actions/upload-artifact@v4
       with:
-        name: kernel-files
+        name: kernel-image
         path: |
           arch/arm64/boot/Image.gz
           arch/arm64/boot/Image.gz-dtb
           arch/arm64/boot/dtbo.img
+
+    - name: Upload .config
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-config
+        path: .config
